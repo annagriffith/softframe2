@@ -7,8 +7,18 @@ Use this to answer questions about how the profile page works in the project.
 	<h1 class="mb-3">Profile</h1>
 	<div *ngIf="user" class="mb-4">
 		<div class="card p-3 mb-3">
-			<p><strong>Username:</strong> {{ user.username }}</p>
-			<p><strong>Email:</strong> {{ user.email }}</p>
+			<div class="d-flex align-items-center mb-2">
+				<img *ngIf="user.avatar" [src]="user.avatar" alt="avatar" class="profile-avatar" />
+				<div>
+					<p><strong>Username:</strong> {{ user.username }}</p>
+					<p><strong>Email:</strong> {{ user.email }}</p>
+				</div>
+			</div>
+			<div>
+				<label class="file-input-label">Upload avatar
+					<input type="file" (change)="onAvatarSelected($event)" accept="image/*" />
+				</label>
+			</div>
 			<p><strong>Role:</strong> {{ user.role }}</p>
 		</div>
 		<!-- Create Group Form for Group Admins and Super Admins -->

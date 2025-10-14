@@ -8,9 +8,10 @@ import { LocalStorageService } from './services/local-storage.service';
 
 @Component({
   selector: 'app-root',
+  standalone: true,
   imports: [RouterModule, CommonModule],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrls: ['./app.css']
 })
 export class App implements OnInit {
   // Title signal for the app (not used in template, but can be used for dynamic titles)

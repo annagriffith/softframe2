@@ -29,6 +29,10 @@ export class ApiService {
     return this.http.get('/api/channels' + (groupId ? '?groupId=' + groupId : ''));
   }
 
+  getMessages(channelId: string, page: number = 1, pageSize: number = 50) {
+    return this.http.get(`/api/messages?channelId=${encodeURIComponent(channelId)}&page=${page}&pageSize=${pageSize}`);
+  }
+
   createGroup(payload: any) {
     return this.http.post('/api/groups', payload);
   }

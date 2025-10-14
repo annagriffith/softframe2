@@ -7,12 +7,14 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { LocalStorageService } from '../../services/local-storage.service';
+import { ApiService } from '../../services/api.service';
 import { Group } from '../../models/group.model';
 import { Channel } from '../../models/channel.model';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-profile',
+  standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './profile.html',
   styleUrls: ['./profile.css']
@@ -73,8 +75,22 @@ export class ProfileComponent implements OnInit {
   constructor(
     private router: Router,
     private localStorageService: LocalStorageService,
-    private api: ApiService
+    private api: ApiService,
+    private http: HttpClient
   ) {}
+
+  onAvatarSelected(event: any): void {
+    const file: File = event.target.files && event.target.files[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('avatar', file);
+    this.api.uploadAvatar(form).subscribe((res: any) => {
+      if (res && res.avatar) {
+        this.user.avatar = res.avatar;
+        localStorage.setItem('currentUser', JSON.stringify(this.user));
+      }
+    });
+  }
 
   // Runs when the component loads. Checks if user is logged in, loads groups and channels for the user.
   ngOnInit() {
@@ -106,7 +122,7 @@ export class ProfileComponent implements OnInit {
     }
     // Check for duplicate name in group (from backend channels)
     this.api.getChannels().subscribe((allChannels: any) => {
-      if (allChannels.filter(c => c.groupId === groupId).some(c => c.name === name)) {
+      if (allChannels.filter((c: Channel) => c.groupId === groupId).some((c: Channel) => c.name === name)) {
         this.channelError = 'Channel name already exists.';
         return;
       }
@@ -116,7 +132,7 @@ export class ProfileComponent implements OnInit {
           this.newChannelName = '';
           this.ngOnInit();
         },
-        error: err => {
+        error: (err: any) => {
           this.channelError = err.error?.error || 'Error creating channel.';
         }
       });

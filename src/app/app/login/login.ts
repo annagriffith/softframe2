@@ -1,12 +1,15 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
-import { ApiService } from '../../../services/api.service';
-import { SocketService } from '../../../services/socket.service';
+import { ApiService } from '../../services/api.service';
+import { SocketService } from '../../services/socket.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 // Login component for Frametry6: handles user login and authentication.
 // Use these comments to answer questions about how login works in the project.
 
 @Component({
   selector: 'app-login',
+  standalone: true,
   imports: [FormsModule, CommonModule],
   templateUrl: './login.html',
   styleUrl: './login.css'

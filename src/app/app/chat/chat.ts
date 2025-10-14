@@ -1,72 +1,109 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../services/api.service';
-import { SocketService } from '../../../services/socket.service';
-// Chat component for Frametry6: handles chat UI, message display, and sending messages.
-// Use these comments to answer questions about how chat works in the project.
+import { RouterModule } from '@angular/router';
+import { ApiService } from '../../services/api.service';
+import { SocketService } from '../../services/socket.service';
 
 @Component({
   selector: 'app-chat',
-  imports: [CommonModule, FormsModule],
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  providers: [DatePipe],
   templateUrl: './chat.html',
-  styleUrl: './chat.css'
+  styleUrls: ['./chat.css']
 })
-export class Chat implements OnInit {
-  // Stores the current channel ID from the URL
-  channelId: string = '';
-  // Array of messages for the current channel
+export class ChatComponent implements OnInit, OnDestroy {
+  channelId = '';
+  private currentRoom: string | null = null;
   messages: any[] = [];
-  // The message text the user is typing
-  newMessage: string = '';
-  // The current logged-in user object
+  newMessage = '';
   user: any = null;
+  imagePreviewUrl: string | null = null;
+  private socket: any;
 
-  // Sets up router and route for navigation and reading channel ID from URL
-  constructor(private router: Router, private route: ActivatedRoute, private api: ApiService, private socketService: SocketService) {}
+  constructor(
+    private router: Router,
+    private route: ActivatedRoute,
+    private api: ApiService,
+    private socketService: SocketService
+  ) {}
 
-  // Runs when the component loads. Checks if user is logged in, gets channel ID from URL, and loads messages for that channel.
-  ngOnInit() {
+  ngOnInit(): void {
     const userStr = localStorage.getItem('currentUser');
     if (!userStr) {
       this.router.navigate(['/login']);
       return;
     }
     this.user = JSON.parse(userStr);
-    this.route.queryParams.subscribe(params => {
-      this.channelId = params['channel'] || '';
+    this.route.queryParams.subscribe((params: any) => {
+      const nextChannel = params['channel'] || '';
+      // leave previous room if any
+      if (this.socket && this.currentRoom && this.currentRoom !== nextChannel) {
+        this.socket.emit('leave', { channelId: this.currentRoom });
+      }
+      this.channelId = nextChannel;
+      this.currentRoom = this.channelId || null;
+      // join the room so socket.io emits reach us
+      if (this.socket && this.channelId) {
+        this.socket.emit('join', { channelId: this.channelId });
+      }
       this.loadMessages();
     });
-    // Connect socket if token present
     const token = localStorage.getItem('authToken');
     if (token) {
-      const sock = this.socketService.connect(token);
-      sock.on('message', (m: any) => {
+      this.socket = this.socketService.connect(token);
+      this.socket.on('message', (m: any) => {
         if (m.channelId === this.channelId) this.messages.push(m);
       });
-      sock.on('history', (msgs: any[]) => {
+      this.socket.on('history', (msgs: any[]) => {
         if (msgs && msgs.length) this.messages = msgs;
       });
     }
   }
 
-  // Loads all messages for the current channel from localStorage and updates the messages array.
-  loadMessages() {
+  ngOnDestroy(): void {
+    if (this.socket && this.channelId) {
+      this.socket.emit('leave', { channelId: this.channelId });
+      this.socket.off('message');
+      this.socket.off('history');
+    }
+  }
+
+  loadMessages(): void {
     if (!this.channelId) return;
-    // Load from server
-    this.api.getMessages = this.api.getMessages || ((ch: string) => this.api['http'].get(`/api/messages?channelId=${ch}`));
     this.api.getMessages(this.channelId).subscribe((res: any) => {
       this.messages = res.messages || [];
     });
   }
 
-  // Adds a new message to the messages array and saves it to localStorage. Called when the user sends a message.
-  sendMessage() {
+  sendMessage(): void {
     if (!this.newMessage.trim()) return;
     const payload = { channelId: this.channelId, text: this.newMessage };
-    this.api.sendMessage(payload).subscribe((res: any) => {
+    this.api.sendMessage(payload).subscribe(() => {
       this.newMessage = '';
+    });
+  }
+
+  onImageSelected(event: any): void {
+    const file: File = event.target.files && event.target.files[0];
+    if (!file || !this.channelId) return;
+    // create a local preview
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.imagePreviewUrl = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+
+    // upload (do not wait for preview to finish)
+    const form = new FormData();
+    form.append('channelId', this.channelId);
+    form.append('image', file, file.name);
+    this.api.uploadMessageImage(form).subscribe(() => {
+      (event.target as HTMLInputElement).value = '';
+      // clear preview after upload
+      setTimeout(() => this.imagePreviewUrl = null, 1500);
     });
   }
 }

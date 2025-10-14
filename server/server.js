@@ -20,10 +20,22 @@ app.use(express.json());
 // Static uploads
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir));
+	// Serve uploads via the API path so the Angular dev-server proxy (proxy.conf.json)
+	// will forward requests to the backend (proxy only proxies /api by default).
+	app.use('/api/uploads', express.static(uploadsDir));
+	// Keep legacy route for direct access (useful when serving the backend standalone)
+	app.use('/uploads', express.static(uploadsDir));
 
-// Multer for file uploads (avatars, message images)
-const upload = multer({ dest: uploadsDir, limits: { fileSize: 5 * 1024 * 1024 } });
+// Multer for file uploads (avatars, message images) - preserve original extension
+const storage = multer.diskStorage({
+  destination: uploadsDir,
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '';
+    const name = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, name);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // JWT helper
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
@@ -45,6 +57,35 @@ function jwtMiddleware(req, res, next) {
 		return next();
 	} catch (err) {
 		return res.status(401).json({ error: 'Invalid token' });
+	}
+}
+
+// Helper: enrich messages with sender avatars
+async function enrichMessagesWithAvatars(messages) {
+	if (!messages || !messages.length) return messages;
+	try {
+		const dbi = db.getDb();
+		// Normalize message fields to canonical shape
+		const normalized = messages.map(m => {
+			const sender = m.sender || m.user || m.from || null;
+			const timestamp = m.timestamp || m.time || m.createdAt || m.date || null;
+			const text = m.text || m.message || null;
+			const type = m.type || (m.imagePath ? 'image' : 'text');
+			const imagePath = m.imagePath || m.image || null;
+			return { ...m, sender, timestamp: timestamp ? new Date(timestamp) : null, text, type, imagePath };
+		});
+		const senders = Array.from(new Set(normalized.map(m => m.sender).filter(Boolean)));
+		if (!senders.length) return normalized;
+		const users = await dbi.collection('users').find({ username: { $in: senders } }, { projection: { username: 1, avatar: 1 } }).toArray();
+		const avatarMap = {};
+		users.forEach(u => { avatarMap[u.username] = u.avatar || null; });
+		return normalized.map(m => ({
+			...m,
+			avatar: avatarMap[m.sender] || null
+		}));
+	} catch (err) {
+		console.error('Error enriching messages:', err);
+		return messages;
 	}
 }
 
@@ -84,7 +125,8 @@ io.on('connection', (socket) => {
 				.sort({ timestamp: -1 })
 				.limit(20)
 				.toArray();
-			socket.emit('history', messages.reverse());
+		const enriched = await enrichMessagesWithAvatars(messages.reverse());
+		socket.emit('history', enriched);
 		} catch (err) {
 			console.error('Error fetching history:', err);
 		}
@@ -188,7 +230,7 @@ app.get('/api/auth/me', async (req, res) => {
 app.post('/api/auth/avatar', jwtMiddleware, upload.single('avatar'), async (req, res) => {
 	try {
 		if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-		const imagePath = `/uploads/${path.basename(req.file.path)}`;
+			const imagePath = `/api/uploads/${path.basename(req.file.path)}`;
 		const dbi = db.getDb();
 		await dbi.collection('users').updateOne({ username: req.user.username }, { $set: { avatar: imagePath } });
 		res.json({ success: true, avatar: imagePath });
@@ -339,7 +381,8 @@ app.get('/api/messages', async (req, res) => {
 		const skip = (Number(page) - 1) * Number(pageSize);
 		const cursor = dbi.collection('messages').find({ channelId }).sort({ timestamp: -1 }).skip(skip).limit(Number(pageSize));
 		const messages = await cursor.toArray();
-		res.json({ messages: messages.reverse() });
+		const enriched = await enrichMessagesWithAvatars(messages.reverse());
+		res.json({ messages: enriched });
 	} catch (err) {
 		console.error('Error getting messages:', err);
 		res.status(500).json({ error: 'Internal server error' });
@@ -355,6 +398,9 @@ app.post('/api/messages', jwtMiddleware, async (req, res) => {
 		const dbi = db.getDb();
 		const r = await dbi.collection('messages').insertOne(message);
 		message._id = r.insertedId;
+		// Attach avatar from users collection before emitting
+		const user = await dbi.collection('users').findOne({ username: sender }, { projection: { avatar: 1 } });
+		message.avatar = user && user.avatar ? user.avatar : null;
 		// Broadcast via sockets
 		io.to(channelId).emit('message', message);
 		res.json({ success: true, message });
@@ -368,12 +414,14 @@ app.post('/api/messages/image', jwtMiddleware, upload.single('image'), async (re
 	try {
 		const { channelId } = req.body;
 		if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-		const imagePath = `/uploads/${path.basename(req.file.path)}`;
+	const imagePath = `/api/uploads/${path.basename(req.file.path)}`;
 		const sender = req.user.username;
 		const message = { channelId, sender, text: null, type: 'image', imagePath, timestamp: new Date() };
 		const dbi = db.getDb();
 		const r = await dbi.collection('messages').insertOne(message);
 		message._id = r.insertedId;
+		const user = await dbi.collection('users').findOne({ username: sender }, { projection: { avatar: 1 } });
+		message.avatar = user && user.avatar ? user.avatar : null;
 		io.to(channelId).emit('message', message);
 		res.json({ success: true, message });
 	} catch (err) {

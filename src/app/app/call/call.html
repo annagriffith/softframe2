@@ -1,11 +1,12 @@
 <div class="call-container">
   <h3>Call</h3>
   <div class="videos">
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay muted webkit-playsinline moz-playsinline></video>
+    <video id="remoteVideo" autoplay webkit-playsinline moz-playsinline></video>
   </div>
   <div class="controls">
-    <button (click)="startCall()">Start Call</button>
-    <button (click)="stopCall()">Stop Call</button>
+      <button (click)="startCall()" [disabled]="inCall">Start Call</button>
+      <button (click)="stopCall()" [disabled]="!inCall">Stop Call</button>
+      <div *ngIf="joinedRoom" class="mt-2">Joined call room: {{ joinedRoom }}</div>
   </div>
 </div>

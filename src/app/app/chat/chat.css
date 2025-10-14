@@ -1,0 +1,38 @@
+/* Styles for chat component */
+.list-group-item img[alt="img"] {
+  max-width: 120px;
+  margin-right: 8px;
+}
+.list-group-item img[alt="img"], .list-group-item img.msg-image {
+  max-width: 240px;
+  height: auto;
+  display: block;
+  margin-bottom: 6px;
+}
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+/* Responsive image messages */
+.msg-image {
+  max-width: 220px;
+  height: auto;
+  border-radius: 6px;
+  margin-right: 8px;
+}
+.chat-time {
+  margin-left: 8px;
+  color: #777;
+}
+.file-input-label {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  cursor: pointer;
+}

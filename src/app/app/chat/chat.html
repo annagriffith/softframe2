@@ -8,13 +8,33 @@ Use this to answer questions about how chat works in the project.
 	<div class="mb-3">
 		<h4>Channel: {{ channelId }}</h4>
 		<ul class="list-group mb-3">
-			<li *ngFor="let msg of messages" class="list-group-item">
-				<strong>{{ msg.user }}</strong>: {{ msg.text }} <span class="text-muted chat-time">{{ msg.time }}</span>
+				<li *ngFor="let msg of messages" class="list-group-item d-flex align-items-start">
+				<img *ngIf="msg.imagePath && msg.type==='image'" [src]="msg.imagePath" class="msg-image" alt="image message" />
+				<div>
+					<div class="d-flex align-items-center">
+						<img *ngIf="msg.avatar" [src]="msg.avatar" alt="avatar" class="msg-avatar" />
+						<strong>{{ msg.sender }}</strong>
+						<span class="text-muted chat-time">{{ msg.timestamp | date:'short' }}</span>
+					</div>
+					<div class="mt-1">{{ msg.text }}</div>
+				</div>
 			</li>
 		</ul>
 		<div class="input-group">
 			<input type="text" [(ngModel)]="newMessage" class="form-control" placeholder="Type a message...">
 			<button class="btn btn-primary" (click)="sendMessage()">Send</button>
+		</div>
+        <div class="mt-2">
+          <a *ngIf="channelId" [routerLink]="['/call']" [queryParams]="{ channel: channelId }" class="btn btn-outline-secondary btn-sm mt-2">Start/Join Call for this Channel</a>
+        </div>
+		<div class="mt-2">
+			<div *ngIf="imagePreviewUrl" class="mb-2">
+				<p class="mb-1">Preview:</p>
+				<img [src]="imagePreviewUrl" class="msg-image" alt="preview" />
+			</div>
+			<label class="file-input-label">Upload image
+				<input type="file" (change)="onImageSelected($event)" accept="image/*" />
+			</label>
 		</div>
 	</div>
 </div>

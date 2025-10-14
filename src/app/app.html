@@ -10,6 +10,7 @@ Use this to answer questions about the overall app structure and navigation.
     <a routerLink="/login" routerLinkActive="active" class="me-3">Login</a>
   <a routerLink="/profile" routerLinkActive="active" class="me-3">Profile</a>
   <a routerLink="/chat" routerLinkActive="active" class="me-3">Chat</a>
+  <a *ngIf="currentUser" routerLink="/call" routerLinkActive="active" class="me-3">Call</a>
   <a *ngIf="currentUser" routerLink="/admin" routerLinkActive="active" class="me-3">Admin</a>
   <a *ngIf="currentUser" (click)="logout()" class="me-3 logout-link">Logout</a>
   </div>

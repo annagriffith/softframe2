@@ -1,0 +1,12 @@
+/* Profile styles */
+.profile-avatar {
+	width: 64px;
+	height: 64px;
+	border-radius: 8px;
+	margin-right: 12px;
+}
+.file-input-label {
+	display: inline-block;
+	margin-top: 8px;
+}
+
