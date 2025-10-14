@@ -73,7 +73,7 @@ export class ProfileComponent implements OnInit {
   constructor(
     private router: Router,
     private localStorageService: LocalStorageService,
-    private http: HttpClient
+    private api: ApiService
   ) {}
 
   // Runs when the component loads. Checks if user is logged in, loads groups and channels for the user.
@@ -85,12 +85,12 @@ export class ProfileComponent implements OnInit {
     }
     this.user = JSON.parse(userStr);
     // Fetch groups and channels from backend
-    this.http.get<Group[]>('/api/groups').subscribe(allGroups => {
-      this.groups = allGroups.filter(g => g.memberIds.includes(this.user.username));
-      this.http.get<Channel[]>('/api/channels').subscribe(allChannels => {
+    this.api.getGroups().subscribe((allGroups: any) => {
+      this.groups = allGroups.filter((g: any) => g.memberIds.includes(this.user.username));
+      this.api.getChannels().subscribe((allChannels: any) => {
         this.channelsByGroup = {};
         for (const group of this.groups) {
-          this.channelsByGroup[group.id] = allChannels.filter(c => c.groupId === group.id);
+          this.channelsByGroup[group.id] = allChannels.filter((c: any) => c.groupId === group.id);
         }
       });
     });
@@ -105,17 +105,13 @@ export class ProfileComponent implements OnInit {
       return;
     }
     // Check for duplicate name in group (from backend channels)
-    this.http.get<Channel[]>('/api/channels').subscribe(allChannels => {
+    this.api.getChannels().subscribe((allChannels: any) => {
       if (allChannels.filter(c => c.groupId === groupId).some(c => c.name === name)) {
         this.channelError = 'Channel name already exists.';
         return;
       }
       // Send create request to backend
-      this.http.post('/api/channels', {
-        requester: this.user.username,
-        groupId,
-        name
-      }).subscribe({
+      this.api.createChannel({ groupId, name }).subscribe({
         next: () => {
           this.newChannelName = '';
           this.ngOnInit();

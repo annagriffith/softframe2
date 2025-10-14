@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../../services/api.service';
+import { SocketService } from '../../../services/socket.service';
 // Chat component for Frametry6: handles chat UI, message display, and sending messages.
 // Use these comments to answer questions about how chat works in the project.
 
@@ -36,27 +38,35 @@ export class Chat implements OnInit {
       this.channelId = params['channel'] || '';
       this.loadMessages();
     });
+    // Connect socket if token present
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      const sock = this.socketService.connect(token);
+      sock.on('message', (m: any) => {
+        if (m.channelId === this.channelId) this.messages.push(m);
+      });
+      sock.on('history', (msgs: any[]) => {
+        if (msgs && msgs.length) this.messages = msgs;
+      });
+    }
   }
 
   // Loads all messages for the current channel from localStorage and updates the messages array.
   loadMessages() {
     if (!this.channelId) return;
-    const key = `messages-${this.channelId}`;
-    const msgs = localStorage.getItem(key);
-    this.messages = msgs ? JSON.parse(msgs) : [];
+    // Load from server
+    this.api.getMessages = this.api.getMessages || ((ch: string) => this.api['http'].get(`/api/messages?channelId=${ch}`));
+    this.api.getMessages(this.channelId).subscribe((res: any) => {
+      this.messages = res.messages || [];
+    });
   }
 
   // Adds a new message to the messages array and saves it to localStorage. Called when the user sends a message.
   sendMessage() {
     if (!this.newMessage.trim()) return;
-    const key = `messages-${this.channelId}`;
-    const msg = {
-      user: this.user.username,
-      text: this.newMessage,
-      time: new Date().toLocaleString()
-    };
-    this.messages.push(msg);
-    localStorage.setItem(key, JSON.stringify(this.messages));
-    this.newMessage = '';
+    const payload = { channelId: this.channelId, text: this.newMessage };
+    this.api.sendMessage(payload).subscribe((res: any) => {
+      this.newMessage = '';
+    });
   }
 }
