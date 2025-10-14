@@ -53,14 +53,29 @@ const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: '*' } });
 
 // Manage socket rooms for channels and call signaling
-io.on('connection', (socket) => {
-	console.log('Socket connected:', socket.id);
+io.use((socket, next) => {
+	// Expect token in socket.handshake.auth.token
+	try {
+		const token = socket.handshake.auth && socket.handshake.auth.token;
+		if (!token) return next(new Error('Authentication error'));
+		const payload = verifyToken(token);
+		socket.user = payload;
+		return next();
+	} catch (err) {
+		return next(new Error('Authentication error'));
+	}
+});
 
-	socket.on('join', async ({ channelId, username }) => {
-		console.log('Socket join:', channelId, username);
-		socket.join(channelId);
-		// Broadcast presence
-		socket.to(channelId).emit('presence', { type: 'join', username });
+io.on('connection', (socket) => {
+	console.log('Socket connected:', socket.id, 'user=', socket.user && socket.user.username);
+
+		socket.on('join', async ({ channelId }) => {
+			const username = socket.user && socket.user.username;
+			console.log('Socket join:', channelId, username);
+			if (!username) return socket.emit('error', { error: 'Unauthorized' });
+			socket.join(channelId);
+			// Broadcast presence
+			socket.to(channelId).emit('presence', { type: 'join', username });
 		// Send last 20 messages to joining socket
 		try {
 			const dbi = db.getDb();
@@ -75,31 +90,36 @@ io.on('connection', (socket) => {
 		}
 	});
 
-	socket.on('leave', ({ channelId, username }) => {
-		console.log('Socket leave:', channelId, username);
-		socket.leave(channelId);
-		socket.to(channelId).emit('presence', { type: 'leave', username });
+		socket.on('leave', ({ channelId }) => {
+			const username = socket.user && socket.user.username;
+			console.log('Socket leave:', channelId, username);
+			if (!username) return socket.emit('error', { error: 'Unauthorized' });
+			socket.leave(channelId);
+			socket.to(channelId).emit('presence', { type: 'leave', username });
 	});
 
-	socket.on('message', async (msg) => {
-		// msg should include { channelId, sender, text, type, imagePath }
-		try {
-			const dbi = db.getDb();
-			const message = {
-				channelId: msg.channelId,
-				sender: msg.sender,
-				text: msg.text || null,
-				type: msg.type || 'text',
-				imagePath: msg.imagePath || null,
-				timestamp: new Date()
-			};
-			const r = await dbi.collection('messages').insertOne(message);
-			message._id = r.insertedId;
-			io.to(msg.channelId).emit('message', message);
-		} catch (err) {
-			console.error('Error saving message:', err);
-		}
-	});
+		socket.on('message', async (msg) => {
+			// msg should include { channelId, text, type, imagePath }
+			try {
+				const username = socket.user && socket.user.username;
+				if (!username) return socket.emit('error', { error: 'Unauthorized' });
+				if (!msg || !msg.channelId) return socket.emit('error', { error: 'Invalid message payload' });
+				const dbi = db.getDb();
+				const message = {
+					channelId: msg.channelId,
+					sender: username,
+					text: msg.text || null,
+					type: msg.type || 'text',
+					imagePath: msg.imagePath || null,
+					timestamp: new Date()
+				};
+				const r = await dbi.collection('messages').insertOne(message);
+				message._id = r.insertedId;
+				io.to(msg.channelId).emit('message', message);
+			} catch (err) {
+				console.error('Error saving message:', err);
+			}
+		});
 
 	// Signaling events for WebRTC
 	socket.on('call:join', ({ roomId, username }) => {
@@ -254,11 +274,11 @@ app.get('/api/groups', async (req, res) => {
 });
 
 // Create a new group (super admin only)
-app.post('/api/groups', async (req, res) => {
+app.post('/api/groups', jwtMiddleware, async (req, res) => {
   try {
-	const { requester, name, adminIds } = req.body;
-	const dbi = db.getDb();
-	const user = await dbi.collection('users').findOne({ username: requester });
+		const { name, adminIds } = req.body;
+		const dbi = db.getDb();
+		const user = await dbi.collection('users').findOne({ username: req.user.username });
 	if (!user || user.role !== 'superAdmin') return res.status(403).json({ error: 'Only super admin can create groups.' });
 	if (!name || !name.trim()) return res.status(400).json({ error: 'Group name is required.' });
 	if (await dbi.collection('groups').findOne({ name: { $regex: `^${name}$`, $options: 'i' } })) return res.status(400).json({ error: 'Group name already exists.' });
@@ -323,11 +343,11 @@ app.get('/api/channels', async (req, res) => {
 });
 
 // Create a new channel (group/super admin only)
-app.post('/api/channels', async (req, res) => {
+app.post('/api/channels', jwtMiddleware, async (req, res) => {
 	try {
-		const { requester, groupId, name } = req.body;
+		const { groupId, name } = req.body;
 		const dbi = db.getDb();
-		const user = await dbi.collection('users').findOne({ username: requester });
+		const user = await dbi.collection('users').findOne({ username: req.user.username });
 		const group = await dbi.collection('groups').findOne({ _id: groupId } ) || await dbi.collection('groups').findOne({ id: groupId });
 		if (!user || !group) return res.status(400).json({ error: 'User or group not found.' });
 		if (!(user.role === 'superAdmin' || (user.role === 'groupAdmin' && (group.adminIds || []).includes(user.username)))) return res.status(403).json({ error: 'Only group/super admin can create channels.' });
@@ -360,9 +380,10 @@ app.get('/api/messages', async (req, res) => {
 	}
 });
 
-app.post('/api/messages', async (req, res) => {
+app.post('/api/messages', jwtMiddleware, async (req, res) => {
 	try {
-		const { channelId, sender, text, type = 'text' } = req.body;
+		const { channelId, text, type = 'text' } = req.body;
+		const sender = req.user.username;
 		if (!channelId || !sender) return res.status(400).json({ error: 'Missing fields' });
 		const message = { channelId, sender, text: text || null, type, imagePath: null, timestamp: new Date() };
 		const dbi = db.getDb();
@@ -377,11 +398,12 @@ app.post('/api/messages', async (req, res) => {
 	}
 });
 
-app.post('/api/messages/image', upload.single('image'), async (req, res) => {
+app.post('/api/messages/image', jwtMiddleware, upload.single('image'), async (req, res) => {
 	try {
-		const { channelId, sender } = req.body;
+		const { channelId } = req.body;
 		if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 		const imagePath = `/uploads/${path.basename(req.file.path)}`;
+		const sender = req.user.username;
 		const message = { channelId, sender, text: null, type: 'image', imagePath, timestamp: new Date() };
 		const dbi = db.getDb();
 		const r = await dbi.collection('messages').insertOne(message);
