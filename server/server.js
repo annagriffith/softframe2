@@ -34,6 +34,20 @@ function verifyToken(token) {
 	return jwt.verify(token, JWT_SECRET);
 }
 
+// JWT middleware for protected routes
+function jwtMiddleware(req, res, next) {
+	const auth = req.headers.authorization;
+	if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+	const token = auth.split(' ')[1];
+	try {
+		const payload = verifyToken(token);
+		req.user = payload;
+		return next();
+	} catch (err) {
+		return res.status(401).json({ error: 'Invalid token' });
+	}
+}
+
 // Start server and socket.io after DB connect
 const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: '*' } });
@@ -147,6 +161,20 @@ app.get('/api/auth/me', async (req, res) => {
 	} catch (err) {
 		console.error('Me error:', err);
 		res.status(401).json({ error: 'Invalid token' });
+	}
+});
+
+// Avatar upload for authenticated users
+app.post('/api/auth/avatar', jwtMiddleware, upload.single('avatar'), async (req, res) => {
+	try {
+		if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+		const imagePath = `/uploads/${path.basename(req.file.path)}`;
+		const dbi = db.getDb();
+		await dbi.collection('users').updateOne({ username: req.user.username }, { $set: { avatar: imagePath } });
+		res.json({ success: true, avatar: imagePath });
+	} catch (err) {
+		console.error('Avatar upload error:', err);
+		res.status(500).json({ error: 'Internal server error' });
 	}
 });
 
