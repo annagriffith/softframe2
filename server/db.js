@@ -10,8 +10,10 @@ let db;
 
 async function connect() {
   if (db) return db;
+  console.log('Connecting to MongoDB at', MONGO_URL, 'db:', DB_NAME);
   client = new MongoClient(MONGO_URL, { useUnifiedTopology: true });
   await client.connect();
+  console.log('MongoDB connected');
   db = client.db(DB_NAME);
   // Ensure basic indexes
   await db.collection('users').createIndex({ username: 1 }, { unique: true });
