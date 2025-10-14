@@ -10,6 +10,7 @@ import { AuthGuard } from './guards/auth.guard'; // Guard: only allow logged-in 
 import { RoleGuard } from './guards/role.guard'; // Guard: restrict by user role
 import { GroupAdmin } from './app/group-admin/group-admin'; // Group admin dashboard
 import { Admin } from './app/admin/admin'; // Super admin dashboard
+import { CallComponent } from './app/call/call';
 
 // Main route definitions for the app
 export const routes: Routes = [
@@ -17,6 +18,7 @@ export const routes: Routes = [
   { path: 'login', component: Login }, // Login page
   { path: 'profile', component: ProfileComponent, canActivate: [AuthGuard] }, // Profile page, only for logged-in users
   { path: 'chat', component: Chat, canActivate: [AuthGuard] }, // Chat page, only for logged-in users
+  { path: 'call', component: CallComponent, canActivate: [AuthGuard] }, // Video call page
   { path: 'group-admin', component: GroupAdmin, canActivate: [AuthGuard, RoleGuard], data: { roles: ['groupAdmin','superAdmin'] } }, // Group admin dashboard, only for group/super admins
   { path: 'admin', component: Admin, canActivate: [AuthGuard, RoleGuard], data: { roles: ['superAdmin'] } }, // Super admin dashboard, only for super admins
   { path: '**', redirectTo: '' } // Wildcard: redirect unknown routes to home
