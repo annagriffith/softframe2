@@ -418,9 +418,12 @@ app.post('/api/messages/image', jwtMiddleware, upload.single('image'), async (re
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-	console.error('Unhandled error:', error);
-	res.status(500).json({ error: 'Internal server error' });
+  console.error('Unhandled error:', error);
+  res.status(500).json({ error: 'Internal server error' });
 });
+
+// Health endpoint
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
@@ -431,10 +434,18 @@ process.on('uncaughtException', (error) => {
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
 	console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-	process.exit(1);
+	// do not exit automatically in dev
 });
 
-app.listen(PORT, () => {
-	console.log(`Server running on port ${PORT}`);
-	console.log(`Data path: ${path.join(__dirname, 'data.json')}`);
-});
+// DB connect and start server
+(async () => {
+	try {
+		await db.connect();
+		server.listen(PORT, () => {
+			console.log(`Server running on port ${PORT}`);
+		});
+	} catch (err) {
+		console.error('Failed to start server, DB error:', err);
+		process.exit(1);
+	}
+})();
