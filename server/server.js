@@ -206,63 +206,47 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Update user role (super admin only)
-app.put('/api/users/:username', (req, res) => {
-	try {
-		console.log('User update request received:', req.params.username, req.body);
-		const { requester, role } = req.body;
-		const username = req.params.username;
-		const data = loadData();
-		
-		const superAdmin = data.users.find(u => u.username === requester && u.role === 'superAdmin');
-		if (!superAdmin) {
-			return res.status(403).json({ error: 'Only super admin can update user roles.' });
-		}
-		
-		if (username === requester) {
-			return res.status(400).json({ error: 'Super admin cannot change own role.' });
-		}
-		
-		const userIndex = data.users.findIndex(u => u.username === username);
-		if (userIndex === -1) {
-			return res.status(404).json({ error: 'User not found.' });
-		}
-		
-		const validRoles = ['user', 'groupAdmin', 'superAdmin'];
-		if (!validRoles.includes(role)) {
-			return res.status(400).json({ error: 'Invalid role.' });
-		}
-		
-		// Update user role
-		data.users[userIndex].role = role;
-		saveData(data);
-		
-		console.log('User role updated successfully:', username, 'to', role);
-		res.json({ success: true, user: data.users[userIndex] });
-	} catch (error) {
-		console.error('Error updating user role:', error);
-		res.status(500).json({ error: 'Internal server error' });
-	}
+app.put('/api/users/:username', jwtMiddleware, async (req, res) => {
+  try {
+	console.log('User update request received:', req.params.username, req.body);
+	const { role } = req.body;
+	const username = req.params.username;
+	const dbi = db.getDb();
+	const requester = req.user.username;
+	const superAdmin = await dbi.collection('users').findOne({ username: requester, role: 'superAdmin' });
+	if (!superAdmin) return res.status(403).json({ error: 'Only super admin can update user roles.' });
+	if (username === requester) return res.status(400).json({ error: 'Super admin cannot change own role.' });
+	const user = await dbi.collection('users').findOne({ username });
+	if (!user) return res.status(404).json({ error: 'User not found.' });
+	const validRoles = ['user', 'groupAdmin', 'superAdmin'];
+	if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+	await dbi.collection('users').updateOne({ username }, { $set: { role } });
+	const updated = await dbi.collection('users').findOne({ username }, { projection: { password: 0 } });
+	console.log('User role updated successfully:', username, 'to', role);
+	res.json({ success: true, user: updated });
+  } catch (error) {
+	console.error('Error updating user role:', error);
+	res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Delete a user (super admin only)
-app.delete('/api/users/:username', (req, res) => {
-	const { requester } = req.body;
-	const data = loadData();
-	const superAdmin = data.users.find(u => u.username === requester && u.role === 'superAdmin');
-	if (!superAdmin) {
-		return res.status(403).json({ error: 'Only super admin can delete users.' });
+app.delete('/api/users/:username', jwtMiddleware, async (req, res) => {
+	try {
+		const requester = req.user.username;
+		const dbi = db.getDb();
+		const superAdmin = await dbi.collection('users').findOne({ username: requester, role: 'superAdmin' });
+		if (!superAdmin) return res.status(403).json({ error: 'Only super admin can delete users.' });
+		const username = req.params.username;
+		if (username === requester) return res.status(400).json({ error: 'Super admin cannot delete self.' });
+		const user = await dbi.collection('users').findOne({ username });
+		if (!user) return res.status(404).json({ error: 'User not found.' });
+		await dbi.collection('users').deleteOne({ username });
+		res.json({ success: true });
+	} catch (err) {
+		console.error('Error deleting user:', err);
+		res.status(500).json({ error: 'Internal server error' });
 	}
-	const username = req.params.username;
-	if (username === requester) {
-		return res.status(400).json({ error: 'Super admin cannot delete self.' });
-	}
-	const userIndex = data.users.findIndex(u => u.username === username);
-	if (userIndex === -1) {
-		return res.status(404).json({ error: 'User not found.' });
-	}
-	data.users.splice(userIndex, 1);
-	saveData(data);
-	res.json({ success: true });
 });
 
 
@@ -275,60 +259,42 @@ app.get('/api/groups', async (req, res) => {
 
 // Create a new group (super admin only)
 app.post('/api/groups', jwtMiddleware, async (req, res) => {
-  try {
+	try {
 		const { name, adminIds } = req.body;
 		const dbi = db.getDb();
-		const user = await dbi.collection('users').findOne({ username: req.user.username });
-	if (!user || user.role !== 'superAdmin') return res.status(403).json({ error: 'Only super admin can create groups.' });
-	if (!name || !name.trim()) return res.status(400).json({ error: 'Group name is required.' });
-	if (await dbi.collection('groups').findOne({ name: { $regex: `^${name}$`, $options: 'i' } })) return res.status(400).json({ error: 'Group name already exists.' });
-	const newGroup = { name: name.trim(), ownerId: requester, adminIds: [requester, ...(adminIds || [])], memberIds: [requester], channelIds: [] };
-	const r = await dbi.collection('groups').insertOne(newGroup);
-	newGroup._id = r.insertedId;
-	res.json({ success: true, group: newGroup });
-  } catch (err) {
-	console.error('Error creating group:', err);
-	res.status(500).json({ error: 'Internal server error' });
-  }
+		const requester = req.user.username;
+		const user = await dbi.collection('users').findOne({ username: requester });
+		if (!user || user.role !== 'superAdmin') return res.status(403).json({ error: 'Only super admin can create groups.' });
+		if (!name || !name.trim()) return res.status(400).json({ error: 'Group name is required.' });
+		if (await dbi.collection('groups').findOne({ name: { $regex: `^${name}$`, $options: 'i' } })) return res.status(400).json({ error: 'Group name already exists.' });
+		const newGroup = { name: name.trim(), ownerId: requester, adminIds: [requester, ...(adminIds || [])], memberIds: [requester], channelIds: [] };
+		const r = await dbi.collection('groups').insertOne(newGroup);
+		newGroup._id = r.insertedId;
+		res.json({ success: true, group: newGroup });
+	} catch (err) {
+		console.error('Error creating group:', err);
+		res.status(500).json({ error: 'Internal server error' });
+	}
 });
 
 // Delete a group (super admin only)
-app.delete('/api/groups/:groupId', (req, res) => {
+app.delete('/api/groups/:groupId', jwtMiddleware, async (req, res) => {
 	try {
-		console.log('Group deletion request received:', req.params.groupId, req.body);
-		const { requester } = req.body;
+		const requester = req.user.username;
+		const dbi = db.getDb();
+		const user = await dbi.collection('users').findOne({ username: requester });
+		if (!user || user.role !== 'superAdmin') return res.status(403).json({ error: 'Only super admin can delete groups.' });
 		const groupId = req.params.groupId;
-		const data = loadData();
-		const user = data.users.find(u => u.username === requester);
-		
-		if (!user || user.role !== 'superAdmin') {
-			return res.status(403).json({ error: 'Only super admin can delete groups.' });
-		}
-		
-		const groupIndex = data.groups.findIndex(g => g.id === groupId);
-		if (groupIndex === -1) {
-			return res.status(404).json({ error: 'Group not found.' });
-		}
-		
-		const group = data.groups[groupIndex];
-		
-		// Don't allow deleting the General group
-		if (group.name === 'General' || group.id === 'g1') {
-			return res.status(400).json({ error: 'Cannot delete the General group.' });
-		}
-		
-		// Remove all channels associated with this group
-		data.channels = data.channels.filter(c => c.groupId !== groupId);
-		
+		const group = await dbi.collection('groups').findOne({ _id: groupId }) || await dbi.collection('groups').findOne({ id: groupId });
+		if (!group) return res.status(404).json({ error: 'Group not found.' });
+		if (group.name === 'General' || group.id === 'g1') return res.status(400).json({ error: 'Cannot delete the General group.' });
+		// Remove channels associated with this group
+		await dbi.collection('channels').deleteMany({ groupId: groupId });
 		// Remove the group
-		data.groups.splice(groupIndex, 1);
-		
-		saveData(data);
-		
-		console.log('Group deleted successfully:', groupId);
+		await dbi.collection('groups').deleteOne({ _id: group._id });
 		res.json({ success: true });
-	} catch (error) {
-		console.error('Error deleting group:', error);
+	} catch (err) {
+		console.error('Error deleting group:', err);
 		res.status(500).json({ error: 'Internal server error' });
 	}
 });
