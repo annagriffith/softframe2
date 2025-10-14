@@ -24,7 +24,7 @@ export class Chat implements OnInit {
   user: any = null;
 
   // Sets up router and route for navigation and reading channel ID from URL
-  constructor(private router: Router, private route: ActivatedRoute) {}
+  constructor(private router: Router, private route: ActivatedRoute, private api: ApiService, private socketService: SocketService) {}
 
   // Runs when the component loads. Checks if user is logged in, gets channel ID from URL, and loads messages for that channel.
   ngOnInit() {
