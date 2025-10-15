@@ -1,4 +1,10 @@
 // Basic Express backend for Frametry6 chat app (MongoDB + Socket.IO)
+// This file defines:
+// - Express app setup (JSON, CORS, static uploads)
+// - JWT helpers and middleware
+// - Socket.IO gateway for realtime chat (join/leave/message/history)
+// - REST API: auth (register/login/me/avatar), users, groups, channels, messages
+// - Startup flow: connect DB, optional seed, then listen on PORT
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -39,14 +45,24 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // JWT helper
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
+/**
+ * Create a signed JWT for a given payload.
+ * Input: payload: { username: string }
+ * Output: JWT string with 7d expiry
+ */
 function signToken(payload) {
 	return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
+/** Verify a JWT and return its payload or throw on error. */
 function verifyToken(token) {
 	return jwt.verify(token, JWT_SECRET);
 }
 
 // JWT middleware for protected routes
+/**
+ * Express middleware to protect routes with Bearer token.
+ * Sets req.user on success; returns 401 on failure.
+ */
 function jwtMiddleware(req, res, next) {
 	const auth = req.headers.authorization;
 	if (!auth) return res.status(401).json({ error: 'Unauthorized' });
@@ -61,6 +77,12 @@ function jwtMiddleware(req, res, next) {
 }
 
 // Helper: enrich messages with sender avatars
+/**
+ * Normalize messages and attach sender avatar URLs.
+ * - Resolves sender field aliases
+ * - Converts timestamps to Date
+ * - Looks up user avatars from DB
+ */
 async function enrichMessagesWithAvatars(messages) {
 	if (!messages || !messages.length) return messages;
 	try {
@@ -94,6 +116,7 @@ const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: '*' } });
 
 // Manage socket rooms for channels and call signaling
+/** Socket.IO auth: expects token in socket.handshake.auth.token */
 io.use((socket, next) => {
 	// Expect token in socket.handshake.auth.token
 	try {
@@ -107,6 +130,7 @@ io.use((socket, next) => {
 	}
 });
 
+/** Primary Socket.IO handlers for a connected client. */
 io.on('connection', (socket) => {
 	console.log('Socket connected:', socket.id, 'user=', socket.user && socket.user.username);
 
@@ -177,6 +201,10 @@ io.on('connection', (socket) => {
 });
 
 // Seed database from data.json if empty (first run)
+/**
+ * Seed database collections from server/data.json on first run (when no users exist).
+ * Populates users (with hashed passwords), groups, and channels.
+ */
 async function seedIfEmpty() {
 	try {
 		const dbi = db.getDb();
@@ -235,8 +263,13 @@ async function seedIfEmpty() {
 	}
 }
 
-// Auth endpoint
 // Auth endpoints: register & login
+/**
+ * POST /api/auth/register
+ * Body: { username, password, email }
+ * Creates a new user with role 'user', adds them to all existing groups/channels,
+ * returns { success, token, user, groups, channels }.
+ */
 app.post('/api/auth/register', async (req, res) => {
 	try {
 		const { username, password, email } = req.body;
@@ -246,7 +279,33 @@ app.post('/api/auth/register', async (req, res) => {
 		const user = { username, password: hashed, email, role: 'user', avatar: null };
 		await dbi.collection('users').insertOne(user);
 		const token = signToken({ username });
-		res.json({ success: true, token, user: { username, email, role: user.role, avatar: null } });
+		// Ensure the new user is a member of all existing groups and channels
+		const existingGroups = await dbi.collection('groups').find({}).toArray();
+		for (const g of existingGroups) {
+			const members = Array.isArray(g.memberIds) ? g.memberIds : [];
+			if (!members.includes(username)) {
+				const filter = g._id ? { _id: g._id } : (g.id ? { id: g.id } : { name: g.name });
+				await dbi.collection('groups').updateOne(filter, { $set: { memberIds: [...members, username] } });
+			}
+		}
+		const existingChannels = await dbi.collection('channels').find({}).toArray();
+		for (const c of existingChannels) {
+			const members = Array.isArray(c.memberIds) ? c.memberIds : [];
+			if (!members.includes(username)) {
+				const filter = c._id ? { _id: c._id } : (c.id ? { id: c.id } : { name: c.name, groupId: c.groupId });
+				await dbi.collection('channels').updateOne(filter, { $set: { memberIds: [...members, username] } });
+			}
+		}
+		// Fetch updated lists to return to client
+		const groups = await dbi.collection('groups').find({}).toArray();
+		const channels = await dbi.collection('channels').find({}).toArray();
+		res.json({
+			success: true,
+			token,
+			user: { username, email, role: user.role, avatar: null },
+			groups,
+			channels
+		});
 	} catch (err) {
 		console.error('Register error:', err);
 		res.status(500).json({ error: err.message });
@@ -254,6 +313,11 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
+	/**
+	 * POST /api/auth/login
+	 * Body: { username, password }
+	 * Returns { success, token, user } on success or 401 on invalid credentials.
+	 */
 	try {
 		const { username, password } = req.body;
 		const dbi = db.getDb();
@@ -270,6 +334,10 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Me endpoint
+/**
+ * GET /api/auth/me
+ * Returns the current user (minus password) based on Authorization header.
+ */
 app.get('/api/auth/me', async (req, res) => {
 	try {
 		const auth = req.headers.authorization;
@@ -286,6 +354,11 @@ app.get('/api/auth/me', async (req, res) => {
 });
 
 // Avatar upload for authenticated users
+/**
+ * POST /api/auth/avatar
+ * Multipart form-data: field 'avatar' (file)
+ * Saves avatar and returns { success, avatar } (URL under /api/uploads).
+ */
 app.post('/api/auth/avatar', jwtMiddleware, upload.single('avatar'), async (req, res) => {
 	try {
 		if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -300,6 +373,10 @@ app.post('/api/auth/avatar', jwtMiddleware, upload.single('avatar'), async (req,
 });
 
 // Users endpoints (admin features omitted for brevity)
+/**
+ * GET /api/users
+ * Returns all users without passwords.
+ */
 app.get('/api/users', async (req, res) => {
   const dbi = db.getDb();
   const users = await dbi.collection('users').find({}, { projection: { password: 0 } }).toArray();
@@ -307,6 +384,11 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Create a new user (super admin only)
+/**
+ * POST /api/users (super admin only)
+ * Body: { username, email, role='user', password='123' }
+ * Creates a user and adds them to all groups/channels. Returns { success, user }.
+ */
 app.post('/api/users', jwtMiddleware, async (req, res) => {
 	try {
 		const requester = req.user.username;
@@ -335,6 +417,23 @@ app.post('/api/users', jwtMiddleware, async (req, res) => {
 		const hashed = await bcrypt.hash(password, 10);
 		const doc = { username, email, role, password: hashed, avatar: null };
 		await dbi.collection('users').insertOne(doc);
+		// Add new user to all existing groups and channels for visibility
+		const gList = await dbi.collection('groups').find({}).toArray();
+		for (const g of gList) {
+			const members = Array.isArray(g.memberIds) ? g.memberIds : [];
+			if (!members.includes(username)) {
+				const filter = g._id ? { _id: g._id } : (g.id ? { id: g.id } : { name: g.name });
+				await dbi.collection('groups').updateOne(filter, { $set: { memberIds: [...members, username] } });
+			}
+		}
+		const cList = await dbi.collection('channels').find({}).toArray();
+		for (const c of cList) {
+			const members = Array.isArray(c.memberIds) ? c.memberIds : [];
+			if (!members.includes(username)) {
+				const filter = c._id ? { _id: c._id } : (c.id ? { id: c.id } : { name: c.name, groupId: c.groupId });
+				await dbi.collection('channels').updateOne(filter, { $set: { memberIds: [...members, username] } });
+			}
+		}
 		const created = { username, email, role, avatar: null };
 		return res.json({ success: true, user: created });
 	} catch (err) {
@@ -344,6 +443,11 @@ app.post('/api/users', jwtMiddleware, async (req, res) => {
 });
 
 // Update user role (super admin only)
+/**
+ * PUT /api/users/:username (super admin only)
+ * Body: { role }
+ * Updates the user's role.
+ */
 app.put('/api/users/:username', jwtMiddleware, async (req, res) => {
   try {
 	console.log('User update request received:', req.params.username, req.body);
@@ -369,6 +473,10 @@ app.put('/api/users/:username', jwtMiddleware, async (req, res) => {
 });
 
 // Delete a user (super admin only)
+/**
+ * DELETE /api/users/:username (super admin only)
+ * Deletes a user and their related data in the future (currently only removes user).
+ */
 app.delete('/api/users/:username', jwtMiddleware, async (req, res) => {
 	try {
 		const requester = req.user.username;
@@ -389,6 +497,10 @@ app.delete('/api/users/:username', jwtMiddleware, async (req, res) => {
 
 
 // Get all groups
+/**
+ * GET /api/groups
+ * Returns all groups.
+ */
 app.get('/api/groups', async (req, res) => {
 	const dbi = db.getDb();
 	const groups = await dbi.collection('groups').find().toArray();
@@ -396,6 +508,11 @@ app.get('/api/groups', async (req, res) => {
 });
 
 // Create a new group (super admin only)
+/**
+ * POST /api/groups (super admin only)
+ * Body: { name, adminIds }
+ * Creates a new group.
+ */
 app.post('/api/groups', jwtMiddleware, async (req, res) => {
 	try {
 		const { name, adminIds } = req.body;
@@ -416,6 +533,10 @@ app.post('/api/groups', jwtMiddleware, async (req, res) => {
 });
 
 // Delete a group (super admin only)
+/**
+ * DELETE /api/groups/:groupId (super admin only)
+ * Deletes the specified group and its channels (not General).
+ */
 app.delete('/api/groups/:groupId', jwtMiddleware, async (req, res) => {
 	try {
 		const requester = req.user.username;
@@ -438,6 +559,10 @@ app.delete('/api/groups/:groupId', jwtMiddleware, async (req, res) => {
 });
 
 // Get all channels
+/**
+ * GET /api/channels?groupId=optional
+ * Returns channels, optionally filtered by groupId.
+ */
 app.get('/api/channels', async (req, res) => {
 	const { groupId } = req.query;
 	const dbi = db.getDb();
@@ -447,6 +572,11 @@ app.get('/api/channels', async (req, res) => {
 });
 
 // Create a new channel (group/super admin only)
+/**
+ * POST /api/channels (group/super admin)
+ * Body: { groupId, name }
+ * Creates a new channel under a group.
+ */
 app.post('/api/channels', jwtMiddleware, async (req, res) => {
 	try {
 		const { groupId, name } = req.body;
@@ -469,6 +599,10 @@ app.post('/api/channels', jwtMiddleware, async (req, res) => {
 });
 
 // Messages REST endpoints
+/**
+ * GET /api/messages?channelId=&page=&pageSize=
+ * Returns paginated messages for a channel, newest-first then reversed to chronological.
+ */
 app.get('/api/messages', async (req, res) => {
 	try {
 		const { channelId, page = 1, pageSize = 50 } = req.query;

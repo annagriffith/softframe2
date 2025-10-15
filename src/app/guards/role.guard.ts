@@ -4,6 +4,10 @@ import { CanActivate, Router, ActivatedRouteSnapshot } from '@angular/router';
 @Injectable({ providedIn: 'root' })
 export class RoleGuard implements CanActivate {
   constructor(private router: Router) {}
+  /**
+   * Allows navigation only if currentUser.role is in route.data.roles.
+   * Expects route configuration like: data: { roles: ['superAdmin','groupAdmin'] }
+   */
   canActivate(route: ActivatedRouteSnapshot): boolean {
     const raw = localStorage.getItem('currentUser');
   // RoleGuard: Restricts access to routes based on user roles

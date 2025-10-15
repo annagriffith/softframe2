@@ -32,6 +32,13 @@ export class Register {
         if (res && res.token && res.user) {
           localStorage.setItem('authToken', res.token);
           localStorage.setItem('currentUser', JSON.stringify(res.user));
+          // Save channels and groups for new user
+          if (res.channels) {
+            localStorage.setItem('channels', JSON.stringify(res.channels));
+          }
+          if (res.groups) {
+            localStorage.setItem('groups', JSON.stringify(res.groups));
+          }
           this.socketService.connect(res.token);
           this.router.navigate(['/profile']);
         } else {
