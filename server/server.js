@@ -176,6 +176,65 @@ io.on('connection', (socket) => {
 	});
 });
 
+// Seed database from data.json if empty (first run)
+async function seedIfEmpty() {
+	try {
+		const dbi = db.getDb();
+		const usersCount = await dbi.collection('users').estimatedDocumentCount().catch(async () => {
+			const c = await dbi.collection('users').find().limit(1).toArray();
+			return c.length;
+		});
+		if (usersCount && usersCount > 0) {
+			console.log('DB already has users; skipping seed');
+			return;
+		}
+		console.log('Seeding MongoDB from data.json...');
+		const raw = fs.readFileSync(path.join(__dirname, 'data.json'), 'utf8');
+		const data = JSON.parse(raw);
+
+		// Users (hash plain-text passwords from data.json)
+		const users = (data.users || []);
+		const usersDocs = [];
+		for (const u of users) {
+			const hashed = await bcrypt.hash(u.password || '123', 10);
+			usersDocs.push({ username: u.username, email: u.email, role: u.role || 'user', password: hashed, avatar: null });
+		}
+		if (usersDocs.length) {
+			await dbi.collection('users').insertMany(usersDocs, { ordered: false }).catch(() => {});
+		}
+
+		// Groups
+		const groups = (data.groups || []).map(g => ({
+			_id: g.id || g._id || g.name,
+			id: g.id || g._id || g.name,
+			name: g.name,
+			ownerId: g.ownerId,
+			adminIds: g.adminIds || [],
+			memberIds: g.memberIds || [],
+			channelIds: g.channelIds || [],
+		}));
+		if (groups.length) {
+			await dbi.collection('groups').insertMany(groups, { ordered: false }).catch(() => {});
+		}
+
+		// Channels
+		const channels = (data.channels || []).map(c => ({
+			_id: c.id || c._id || `${c.groupId}:${c.name}`,
+			id: c.id || c._id || `${c.groupId}:${c.name}`,
+			groupId: c.groupId,
+			name: c.name,
+			memberIds: c.memberIds || [],
+		}));
+		if (channels.length) {
+			await dbi.collection('channels').insertMany(channels, { ordered: false }).catch(() => {});
+		}
+
+		console.log('Seed complete');
+	} catch (e) {
+		console.warn('Seed error:', e && e.message ? e.message : e);
+	}
+}
+
 // Auth endpoint
 // Auth endpoints: register & login
 app.post('/api/auth/register', async (req, res) => {
@@ -245,6 +304,43 @@ app.get('/api/users', async (req, res) => {
   const dbi = db.getDb();
   const users = await dbi.collection('users').find({}, { projection: { password: 0 } }).toArray();
   res.json(users);
+});
+
+// Create a new user (super admin only)
+app.post('/api/users', jwtMiddleware, async (req, res) => {
+	try {
+		const requester = req.user.username;
+		const { username, email, role = 'user', password = '123' } = req.body || {};
+
+		if (!username || !email) {
+			return res.status(400).json({ error: 'Username and email are required.' });
+		}
+
+		const validRoles = ['user', 'groupAdmin', 'superAdmin'];
+		if (!validRoles.includes(role)) {
+			return res.status(400).json({ error: 'Invalid role.' });
+		}
+
+		const dbi = db.getDb();
+		const superAdmin = await dbi.collection('users').findOne({ username: requester, role: 'superAdmin' });
+		if (!superAdmin) {
+			return res.status(403).json({ error: 'Only super admin can create users.' });
+		}
+
+		const exists = await dbi.collection('users').findOne({ username });
+		if (exists) {
+			return res.status(400).json({ error: 'Username already exists.' });
+		}
+
+		const hashed = await bcrypt.hash(password, 10);
+		const doc = { username, email, role, password: hashed, avatar: null };
+		await dbi.collection('users').insertOne(doc);
+		const created = { username, email, role, avatar: null };
+		return res.json({ success: true, user: created });
+	} catch (err) {
+		console.error('Error creating user:', err);
+		return res.status(500).json({ error: 'Internal server error' });
+	}
 });
 
 // Update user role (super admin only)
@@ -455,6 +551,7 @@ process.on('unhandledRejection', (reason, promise) => {
 (async () => {
 	try {
 		await db.connect();
+		await seedIfEmpty();
 		server.listen(PORT, () => {
 			console.log(`Server running on port ${PORT}`);
 		});

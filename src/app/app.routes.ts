@@ -11,11 +11,13 @@ import { RoleGuard } from './guards/role.guard'; // Guard: restrict by user role
 import { GroupAdmin } from './app/group-admin/group-admin'; // Group admin dashboard
 import { Admin } from './app/admin/admin'; // Super admin dashboard
 import { CallComponent } from './app/call/call';
+import { Register } from './app/register/register';
 
 // Main route definitions for the app
 export const routes: Routes = [
   { path: '', component: Home }, // Home page
   { path: 'login', component: Login }, // Login page
+  { path: 'register', component: Register }, // Registration page
   { path: 'profile', component: ProfileComponent, canActivate: [AuthGuard] }, // Profile page, only for logged-in users
   { path: 'chat', component: ChatComponent, canActivate: [AuthGuard] }, // Chat page, only for logged-in users
   { path: 'call', component: CallComponent, canActivate: [AuthGuard] }, // Video call page

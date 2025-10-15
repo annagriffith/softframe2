@@ -1,277 +1,168 @@
 
-# Frametry6 Chat App
+# Softframe2 • Angular + Node Chat
 
-A modern, role-based group chat application built with Angular and Node.js. Supports Super Admin, Group Admin, and User roles, with per-channel messaging, group/channel management, and a vibrant pink UI theme.
+Role-based chat application built with Angular (standalone components) and Node.js/Express with MongoDB and Socket.IO. Includes Super Admin, Group Admin, and User roles; group/channel management; per-channel messaging; avatar upload; and a pink theme.
 
 ---
 
 ## Features
 
-- **Role-based login:** Super Admin, Group Admin, User
-- **Profile page:** View your groups and channels
-- **Group Admin dashboard:** Create/manage groups, channels, and members
-- **Super Admin dashboard:** Create/delete users
-- **Chat:** Per-channel messaging
-- **Bootstrap & custom pink theme:** Modern, cute, and girly UI
-- **Error/success feedback:** Clear UI feedback for admin actions
-- **Guards:** AuthGuard and RoleGuard for secure routing
-- **LocalStorage:** Frontend data persistence
-- **REST API:** Node.js/Express backend for users, groups, channels
-- **Human-readable code comments**
+- Role-based login: Super Admin, Group Admin, User
+- Admin dashboards: Super Admin (manage users), Group Admin (manage groups/channels)
+- Chat per channel with Socket.IO
+- Avatar uploads served from the backend (`/api/uploads`)
+- Guards: AuthGuard and RoleGuard
+- Angular v20 standalone components
+- Clean API and code comments
 
 ---
 
-## Getting Started
+## Project structure
 
-### Prerequisites
-
-- Node.js (v18+ recommended)
-- npm
-- Angular CLI (v16+ recommended)
-- Git
-
-### Installation
-
-1. **Clone the repository:**
-
- ```sh
- git clone https://github.com/annagriffith/frametry6.git
- cd frametry6
- ```
-
-2. **Install dependencies:**
-
- ```sh
- cd chat
-   npm install
- cd ../server
- npm install
- ```
-
-### Running the App
-
-1. **Start the backend server:**
-
- ```sh
- cd server
- node server.js
- ```
-
-1. **Start the Angular frontend:**
-
- ```sh
- cd ../chat
- npm start
- ```
-
-3. **Open your browser:**
-
-- Frontend: [http://localhost:4200](http://localhost:4200)
-- Backend: [http://localhost:3000](http://localhost:3000)
-
----
-
-## Test Credentials
-
-- Super Admin — **super / 123**
-- Group Admin — **group / 123**
-- User — **user / 123**
-
----
-
-## Project Structure
-
-
-frametry6/
-├── chat/                # Angular frontend
-│   ├── src/app/app/     # Main app components
-│   ├── src/app/models/  # Data models (User, Group, Channel, Message)
-│   ├── src/app/services # LocalStorage service
-│   ├── src/app/guards/  # AuthGuard, RoleGuard
-│   ├── src/styles/      # Global and theme CSS
-│   └── ...
-├── server/              # Node.js/Express backend
-│   ├── server.js        # Main server file
-│   ├── data.json        # Seeded users, groups, channels
-│   └── ...
-└── README.md            # Project documentation
-
----
-
-## Roles & Permissions
-
-- **Super Admin:**
-  - Create/delete users
-  - Access all groups/channels
-  - Create channels in any group
-- **Group Admin:**
-  - Create/manage groups
-  - Create/manage channels
-  - Add/remove group members
-- **User:**
-  - View groups/channels
-  - Chat in channels
-
----
-
-## Rule Clarity
-
-- Users **cannot see a channel** unless they are explicitly added to that channel’s `memberUsernames`.
-
----
-
-## Key Components
-
-- **Home:** Welcome page, navigation
-- **Login:** Role-based authentication
-- **Profile:** User info, groups, channels, channel creation (admin only)
-- **Group Admin:** Group/channel/member management
-- **Admin:** Super admin user management
-- **Chat:** Per-channel messaging
-
----
-
-## Angular Architecture
-
-- **Components:** Home, Login, Profile, Chat, GroupAdmin, Admin
-- **Services:** LocalStorageService (messages per channel; seeding helper)
-- **Guards:** AuthGuard (requires login), RoleGuard (route data.roles)
-- **Models:** User, Group, Channel, Message
-- **Routes:** `/`, `/login`, `/profile`, `/chat`, `/group-admin`, `/admin`
-- **Visibility:** Navbar shows Admin/Group Admin links only for permitted roles.
-
----
-
-## Data Structures (Phase 1)
-
-### User
-
-```json
-{ "username":"group","email":"group@chat.com","role":"groupAdmin" }
-```
-
-### Group
-
-```json
-{
-  "id":"g1","name":"General","ownerUsername":"group",
-  "adminUsernames":["group"], "memberUsernames":["super","group","user"], "channelIds":["c1","c2"]
-}
-```
-
-### Channel
-
-```json
-{ "id":"c1","groupId":"g1","name":"General Chat","memberUsernames":["super","group","user"] }
-```
-
-### Message (localStorage only)
-
-```json
-{ "id":"m1","channelId":"c1","sender":"group","text":"hi","timestamp":1694052882000 }
+```text
+softframe2/
+├─ src/                    # Angular app (frontend)
+│  └─ app/app/             # Components (admin, group-admin, chat, login, etc.)
+├─ server/                 # Node.js/Express backend
+│  ├─ server.js            # Main backend server
+│  ├─ db.js                # Mongo connection + fallbacks
+│  ├─ data.json            # Seed data (users, groups, channels)
+│  └─ uploads/             # Uploaded avatars/images
+├─ proxy.conf.json         # Angular dev-server proxy to backend (incl. websockets)
+├─ package.json            # Frontend scripts/deps
+└─ README.md
 ```
 
 ---
 
-## REST API (Phase 1)
+## Prerequisites
 
-### POST /api/auth
-
-Request: `{ "username": "super", "password": "123" }`
-
-Response: `{ "valid": true, "user": { "username":"super","email":"super@chat.com","role":"superAdmin" } }` or `{ "valid": false }`
-
-### GET /api/users
-
-Response: `[{ "username":"...", "email":"...", "role":"..." }, ...]`
-
-### POST /api/users
-
-Request: `{ "username":"new", "email":"new@chat.com", "role":"user", "password":"123" }`
-
-Rules: **username must be unique**
-
-Response: `{ "ok": true }`
-
-### DELETE /api/users/:username
-
-Response: `{ "ok": true }`
-
-### GET /api/groups
-
-Response: `[Group]` as defined above
-
-### POST /api/groups
-
-Request: `{ "id":"g-123","name":"New Group","ownerUsername":"group","adminUsernames":["group"] }`
-
-Response: `{ "ok": true }`
-
-### PATCH /api/groups/:id/members
-
-Request: `{ "add":"username" }` **or** `{ "remove":"username" }`
-
-Response: `{ "ok": true, "group": { ... } }`
-
-### GET /api/channels?groupId=g1
-
-Response: `[Channel]`
-
-### POST /api/channels
-
-Request: `{ "id":"c-123","groupId":"g1","name":"General Chat" }`
-
-Response: `{ "ok": true }`
-
-### DELETE /api/channels/:id
-
-Response: `{ "ok": true }`
-
-**Rule:** A user **cannot see a channel** unless they are explicitly in that channel’s `memberUsernames`.
+- Node.js 18+ and npm
+- Angular CLI 20+ (optional for local dev: `npm start` uses it)
+- MongoDB 6+ (local) or MongoDB Atlas
 
 ---
 
-## JSON Serialisation
+## Setup
 
-- Server state is persisted to **server/data.json** (users, groups, channels).
-- On **server start**, data is loaded from `data.json`.
-- After **every create/update/delete**, the server writes back to `data.json`.
+1. Install dependencies
 
----
+```powershell
+# From repo root
+npm install
 
-## Theming & UI
+# Backend deps (in server/)
+cd server
+# If you are using a real MongoDB and want to avoid a large postinstall download:
+$env:MONGOMS_DISABLE_POSTINSTALL='1'
+npm install --no-audit --no-fund
+```
 
-- Uses Bootstrap for layout and components
-- Custom pink theme via `src/styles/pink-theme.css`
-- Responsive and modern design
+1. Configure backend environment
 
----
+Create `server/.env` (see `.env.example`):
 
-## Development Notes
+```env
+PORT=3001
+MONGO_URL=mongodb://127.0.0.1:27017
+DB_NAME=frametry
+JWT_SECRET=change-me
+```
 
-- Standalone Angular components (v16+)
-- Guards for route protection
-- LocalStorage for frontend state
-- REST API for backend data
-- Human-readable comments throughout codebase
+Notes:
 
----
-
-## Git & Submission
-
-- Frequent, descriptive commits; feature branches (e.g., `feat/login`, `feat/group-admin`).
-- `.gitignore` excludes `node_modules/`.
-- **Invite tutor** to the private GitHub repo.
-- **Submit a Word copy of this README** on Canvas + the repo link.
+- Use `127.0.0.1` instead of `localhost` to avoid Windows name resolution issues.
+- On first successful connect to an empty MongoDB, the backend seeds from `server/data.json` (passwords are hashed on seed).
 
 ---
 
-## Contributing
+## Run
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
-4. Push to your branch and open a pull request
+Backend (in `server/`):
+
+```powershell
+cd server
+node server.js
+# Logs expected:
+# Connecting to MongoDB at ...
+# MongoDB connected
+# Server running on port 3001
+```
+
+Frontend (in repo root):
+
+```powershell
+cd ..
+
+# Serves at http://localhost:4200
+```
+
+Proxy & websockets:
+
+- `proxy.conf.json` forwards `/api` and `/socket.io` to `http://localhost:3001`.
+- Socket client connects at `/` with `auth: { token }`.
+
+Health check:
+
+- <http://127.0.0.1:3001/api/health> → `{ "ok": true }`
+
+---
+
+## Test accounts (seeded)
+
+- Super Admin — `super / 123`
+- Group Admin — `group / 123`
+- User — `user / 123`
+
+---
+
+## REST API (high level)
+
+Auth
+
+- POST `/api/auth/register` — create user, returns token
+- POST `/api/auth/login` — returns token and user
+- GET `/api/auth/me` — current user (requires Bearer token)
+- POST `/api/auth/avatar` — upload avatar (multipart/form-data, `avatar` field)
+
+Users (super admin only)
+
+- GET `/api/users` — list users (no passwords)
+- POST `/api/users` — body: `{ username, email, role='user', password='123' }`
+- PUT `/api/users/:username` — change role
+- DELETE `/api/users/:username`
+
+Groups & Channels
+
+- GET `/api/groups`
+- POST `/api/groups` (super admin)
+- DELETE `/api/groups/:groupId` (super admin)
+- GET `/api/channels?groupId=...`
+- POST `/api/channels` (group/super admin)
+
+Messages
+
+- GET `/api/messages?channelId=...&page=1&pageSize=50`
+- POST `/api/messages` (JWT) — `{ channelId, text, type='text' }`
+- POST `/api/messages/image` (JWT, multipart/form-data `image`)
+
+Socket.IO
+
+- Connect with `io('/', { auth: { token } })`
+- Rooms per channel; events: `join`, `leave`, `message`, `history`, `presence`
+
+---
+
+## Troubleshooting (Windows/PowerShell)
+
+- Run backend from the `server/` folder. Running `node server.js` at repo root will fail.
+- Use `127.0.0.1` rather than `localhost` for quick health checks.
+- PowerShell aliases `curl` to Invoke-WebRequest; use `curl.exe` if needed.
+- If `npm install` in `server/` begins downloading ~500MB for `mongodb-memory-server` but you use a real Mongo, set:
+  - `$env:MONGOMS_DISABLE_POSTINSTALL='1'`
+  - then `npm install --no-audit --no-fund`
+- Confirm Mongo is listening: `Test-NetConnection 127.0.0.1 -Port 27017`
+- Backend port check: `Test-NetConnection 127.0.0.1 -Port 3001`
 
 ---
 
@@ -287,7 +178,8 @@ Anna Griffith
 
 ---
 
-## Contact & Support
+## Support
 
-- GitHub Issues: [https://github.com/annagriffith/frametry6/issues](https://github.com/annagriffith/frametry6/issues)
-- For questions, open an issue or contact the author via GitHub
+- Open issues on the repository with steps and logs
+
+## REST API (Phase 1)
