@@ -2,12 +2,14 @@
 // Use these comments to answer questions about the home page and its role in the project.
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterModule],
+  standalone: true,
+  imports: [RouterModule, CommonModule],
   templateUrl: './home.html',
-  styleUrl: './home.css'
+  styleUrls: ['./home.css']
 })
 export class Home {
   // This is the main landing page for the chat app. It shows welcome info and navigation links.

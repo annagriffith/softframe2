@@ -45,7 +45,7 @@ export class Register {
           this.error = res?.error || 'Registration failed.';
         }
       },
-      error: (err) => {
+      error: (err: any) => {
         this.error = err?.error?.error || 'Server error.';
       }
     });
