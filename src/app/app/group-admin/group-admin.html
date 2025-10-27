@@ -20,8 +20,8 @@ Use this to answer questions about how group/channel management works in the pro
   <h3>Groups</h3>
   <ul>
     <li *ngFor="let group of groups">
-      <strong>{{ group.name }}</strong>
-      <button class="btn btn-danger btn-sm ms-2" (click)="deleteGroup(group.id)">Delete Group</button>
+  <strong>{{ group.name }}</strong>
+  <button *ngIf="currentUser?.role === 'superAdmin'" class="btn btn-danger btn-sm ms-2" (click)="deleteGroup(group.id)">Delete Group</button>
       <button class="btn btn-primary btn-sm ms-2" (click)="selectGroup(group.id)">Manage</button>
     </li>
   </ul>
@@ -41,7 +41,7 @@ Use this to answer questions about how group/channel management works in the pro
     <li *ngFor="let channel of channels">
   {{ channel.name }}
   <a class="btn btn-sm btn-outline-primary ms-2" [routerLink]="['/chat', (channel.id || channel._id)]">Open</a>
-      <button class="btn btn-danger btn-sm ms-2" (click)="deleteChannel(channel.id)">Delete Channel</button>
+  <button class="btn btn-danger btn-sm ms-2" (click)="deleteChannel(channel.id || channel._id)">Delete Channel</button>
       <div class="mt-1">
         <label class="form-label me-2">Add member to channel</label>
         <input class="form-control d-inline-block w-auto" [(ngModel)]="channelMemberToAdd[channel.id || channel._id]" placeholder="username">

@@ -159,8 +159,16 @@ export class GroupAdmin implements OnInit {
 
   // Deletes a channel from the backend and reloads channels
   deleteChannel(channelId: string) {
-    this.http.delete(`/api/channels/${channelId}`).subscribe(() => {
-      this.loadChannels(this.selectedGroupId);
+    if (!channelId) return;
+    const ok = window.confirm('Delete this channel and its messages? This cannot be undone.');
+    if (!ok) return;
+    this.http.delete(`/api/channels/${channelId}`).subscribe({
+      next: () => {
+        this.loadChannels(this.selectedGroupId);
+      },
+      error: err => {
+        this.error = err.error?.error || 'Error deleting channel.';
+      }
     });
   }
 
@@ -181,10 +189,18 @@ export class GroupAdmin implements OnInit {
 
   // Deletes a group from the backend and reloads groups
   deleteGroup(groupId: string) {
-    this.http.delete(`/api/groups/${groupId}`).subscribe(() => {
-      this.selectedGroupId = '';
-      this.loadGroups();
-      this.channels = [];
+    if (!groupId) return;
+    const ok = window.confirm('Delete this group and all its channels/messages? This cannot be undone.');
+    if (!ok) return;
+    this.http.delete(`/api/groups/${groupId}`).subscribe({
+      next: () => {
+        this.selectedGroupId = '';
+        this.loadGroups();
+        this.channels = [];
+      },
+      error: err => {
+        this.error = err.error?.error || 'Error deleting group.';
+      }
     });
   }
 }
