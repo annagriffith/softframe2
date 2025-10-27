@@ -71,7 +71,6 @@ export class ChatComponent implements OnInit, OnDestroy {
             this.callFrom = m.sender;
             this.maybeNotifyIncomingCall(this.channelId, m.sender as string);
             this.showIncomingToast();
-            this.delayedAutoJoin(payload);
           }
         }
       });
@@ -85,7 +84,6 @@ export class ChatComponent implements OnInit, OnDestroy {
             this.callFrom = m.sender;
             this.maybeNotifyIncomingCall(this.channelId, m.sender as string);
             this.showIncomingToast();
-            this.delayedAutoJoin(payload);
           }
         }
       });
@@ -101,7 +99,6 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.maybeNotifyIncomingCall(this.channelId, this.callFrom || 'someone');
           // Auto-join the call page for WhatsApp-like behavior
           this.showIncomingToast();
-          this.delayedAutoJoin(p);
         }
       });
       // Alias call:incoming (from checklist API)
@@ -113,7 +110,6 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.lastCallId = p.callId || this.lastCallId;
           this.maybeNotifyIncomingCall(this.channelId, this.callFrom || 'someone');
           this.showIncomingToast();
-          this.delayedAutoJoin(p);
         }
       });
       // New: explicit call:invite event name
@@ -126,7 +122,6 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.lastInviteRoom = this.channelId;
           this.maybeNotifyIncomingCall(this.channelId, this.callFrom || 'someone');
           this.showIncomingToast();
-          this.delayedAutoJoin(p);
         }
       });
 
