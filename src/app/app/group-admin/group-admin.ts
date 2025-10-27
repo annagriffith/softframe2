@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { ApiService } from '../../services/api.service';
 // GroupAdmin component for Frametry6: lets group admins manage groups, channels, and members.
 // Use these comments to answer questions about how group/channel management works in the project.
 
 @Component({
   selector: 'app-group-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './group-admin.html',
   styleUrls: ['./group-admin.css']
 })
@@ -33,9 +35,11 @@ export class GroupAdmin implements OnInit {
   error: string = '';
   // Success message to display in the UI
   success: string = '';
+  // Per-channel member to add (simple map channelId->username)
+  channelMemberToAdd: { [channelId: string]: string } = {};
 
   // Loads the current user from localStorage
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private api: ApiService) {
     const userStr = localStorage.getItem('currentUser');
     this.currentUser = userStr ? JSON.parse(userStr) : null;
   }
@@ -133,7 +137,7 @@ export class GroupAdmin implements OnInit {
       this.error = 'Member and group required.';
       return;
     }
-    this.http.patch(`/api/groups/${this.selectedGroupId}/members`, { add: this.memberToAdd }).subscribe({
+    this.api.updateGroupMembers(this.selectedGroupId, { add: this.memberToAdd }).subscribe({
       next: () => {
         this.memberToAdd = '';
         this.error = '';
@@ -148,7 +152,7 @@ export class GroupAdmin implements OnInit {
   // Removes a member from the selected group
   removeMember(username: string) {
     if (!this.selectedGroupId) return;
-    this.http.patch(`/api/groups/${this.selectedGroupId}/members`, { remove: username }).subscribe(() => {
+    this.api.updateGroupMembers(this.selectedGroupId, { remove: username }).subscribe(() => {
       this.loadGroups();
     });
   }
@@ -157,6 +161,21 @@ export class GroupAdmin implements OnInit {
   deleteChannel(channelId: string) {
     this.http.delete(`/api/channels/${channelId}`).subscribe(() => {
       this.loadChannels(this.selectedGroupId);
+    });
+  }
+
+  // Add member to a specific channel
+  addChannelMember(channelId: string) {
+    const username = (this.channelMemberToAdd[channelId] || '').trim();
+    if (!username) return;
+    this.api.updateChannelMembers(channelId, { add: username }).subscribe({
+      next: () => {
+        this.channelMemberToAdd[channelId] = '';
+        this.loadChannels(this.selectedGroupId);
+      },
+      error: err => {
+        this.error = err.error?.error || 'Error adding channel member.';
+      }
     });
   }
 

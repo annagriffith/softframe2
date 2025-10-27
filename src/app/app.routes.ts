@@ -19,7 +19,8 @@ export const routes: Routes = [
   { path: 'login', component: Login }, // Login page
   { path: 'register', component: Register }, // Registration page
   { path: 'profile', component: ProfileComponent, canActivate: [AuthGuard] }, // Profile page, only for logged-in users
-  { path: 'chat', component: ChatComponent, canActivate: [AuthGuard] }, // Chat page, only for logged-in users
+  { path: 'chat', component: ChatComponent, canActivate: [AuthGuard] }, // Chat root; will auto-select first channel
+  { path: 'chat/:channel', component: ChatComponent, canActivate: [AuthGuard] }, // Chat page with explicit channel
   { path: 'call', component: CallComponent, canActivate: [AuthGuard] }, // Video call page
   { path: 'group-admin', component: GroupAdmin, canActivate: [AuthGuard, RoleGuard], data: { roles: ['groupAdmin','superAdmin'] } }, // Group admin dashboard, only for group/super admins
   { path: 'admin', component: Admin, canActivate: [AuthGuard, RoleGuard], data: { roles: ['superAdmin'] } }, // Super admin dashboard, only for super admins

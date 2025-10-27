@@ -2,15 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "module": "commonjs",
+    "module": "es2015",
     "types": ["jasmine", "node"],
     "allowJs": true,
     "noEmit": false,
     "forceConsistentCasingInFileNames": true
   },
   "files": [
-    "src/test.ts",
-    "src/polyfills.ts"
+    
   ],
   "include": [
     "src/**/*.spec.ts",

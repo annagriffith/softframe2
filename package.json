@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --proxy-config proxy.conf.json",
+    "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "backend": "npm --prefix server run dev:mongo",
+    "start:all": "powershell -NoProfile -Command \"Start-Process -NoNewWindow npm -ArgumentList 'run','backend'; Start-Sleep -Seconds 2; npm run start\"",
+    "start:both": "concurrently -n server,web -c magenta,green \"npm --prefix server run dev\" \"ng serve chat --port 4300\"",
+    "start:both:mongo": "concurrently -n server,web -c magenta,green \"npm --prefix server run dev:mongo\" \"ng serve chat --port 4300\""
   },
   "prettier": {
     "printWidth": 100,
@@ -39,6 +43,7 @@
     "@angular/cli": "^20.2.2",
     "@angular/compiler-cli": "^20.2.0",
     "@types/jasmine": "~5.1.0",
+    "concurrently": "^9.0.1",
     "jasmine-core": "~5.9.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",

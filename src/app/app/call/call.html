@@ -1,8 +1,8 @@
 <div class="call-container">
   <h3>Call</h3>
   <div class="videos">
-    <video id="localVideo" autoplay muted webkit-playsinline moz-playsinline></video>
-    <video id="remoteVideo" autoplay webkit-playsinline moz-playsinline></video>
+    <video #localVideo id="localVideo" autoplay muted webkit-playsinline moz-playsinline></video>
+    <video #remoteVideo id="remoteVideo" autoplay webkit-playsinline moz-playsinline></video>
   </div>
   <div class="controls">
       <button (click)="startCall()" [disabled]="inCall">Start Call</button>

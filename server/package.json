@@ -3,22 +3,43 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+  "dev": "cross-env NODE_ENV=development USE_TINY_DB=true PORT=3001 node server.js",
+  "dev:mongo": "cross-env NODE_ENV=development USE_TINY_DB=false PORT=3001 node server.js",
+  "dev:3005": "cross-env NODE_ENV=development USE_TINY_DB=true PORT=3005 node server.js",
+  "test": "cross-env NODE_ENV=test AUTOSTART_SERVER=false USE_TINY_DB=true PORT=3999 nyc --reporter=text --reporter=html mocha \"test/**/*.spec.js\" --timeout 15000 --require test/_setup.js",
+  "test:nocov": "cross-env NODE_ENV=test AUTOSTART_SERVER=false USE_TINY_DB=true PORT=3999 mocha \"test/**/*.spec.js\" --timeout 20000 --require test/_setup.js",
+    "test:watch": "npm run test -- -w",
+    "coverage:open": "start ./coverage/index.html",
+    "start": "node server.js",
+    "smoke:socket": "node smoketest.socket.js",
+    "smoke:call": "node smoketest.call.js",
+    "smoke:call:3005": "cross-env BASE=http://127.0.0.1:3005 node smoketest.call.js",
+    "smoke:call.socket:3005": "cross-env BASE=http://127.0.0.1:3005 node smoketest.call.socket.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "mongodb": "^5.8.0",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.0",
-    "socket.io": "^4.8.1",
-    "multer": "^1.4.5-lts.1",
+    "chat": "file:..",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "mongodb-memory-server": "^9.5.0"
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "mongodb": "^5.8.0",
+    "mongodb-memory-server": "^9.5.0",
+    "multer": "^1.4.5-lts.1",
+    "server": "file:",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "chai": "^4.4.1",
+    "cross-env": "^7.0.3",
+    "mocha": "^10.7.3",
+    "nyc": "^15.1.0",
+    "jest": "^29.7.0",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^6.3.4"
   }
 }

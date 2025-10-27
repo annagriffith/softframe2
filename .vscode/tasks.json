@@ -1,42 +1,85 @@
 {
-  // For more information, visit: https://go.microsoft.com/fwlink/?LinkId=733558
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "type": "npm",
-      "script": "start",
-      "isBackground": true,
-      "problemMatcher": {
-        "owner": "typescript",
-        "pattern": "$tsc",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": {
-            "regexp": "(.*?)"
-          },
-          "endsPattern": {
-            "regexp": "bundle generation complete"
-          }
-        }
-      }
-    },
-    {
-      "type": "npm",
-      "script": "test",
-      "isBackground": true,
-      "problemMatcher": {
-        "owner": "typescript",
-        "pattern": "$tsc",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": {
-            "regexp": "(.*?)"
-          },
-          "endsPattern": {
-            "regexp": "bundle generation complete"
-          }
-        }
-      }
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "backend-dev",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"cross-env",
+				"NODE_ENV=development",
+				"USE_TINY_DB=true",
+				"PORT=3001",
+				"node",
+				"server/server.js"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "frontend-serve-4311",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"ng",
+				"serve",
+				"chat",
+				"--port",
+				"4311"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "start-both",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Start-Process -NoNewWindow npm -ArgumentList 'run','backend'; Start-Sleep -Seconds 2; npx ng serve chat --port 4311"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "npm: start",
+			"type": "npm",
+			"script": "start",
+			"isBackground": true
+		},
+		{
+			"label": "npm: test",
+			"type": "npm",
+			"script": "test",
+			"isBackground": true
+		},
+		{
+			"label": "backend-dev",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"cross-env",
+				"NODE_ENV=development",
+				"USE_TINY_DB=true",
+				"PORT=3001",
+				"node",
+				"server/server.js"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "frontend-serve-4311",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"ng",
+				"serve",
+				"chat",
+				"--port",
+				"4311"
+			],
+			"isBackground": true
+		}
+	]
 }

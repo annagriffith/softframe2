@@ -24,7 +24,7 @@ Use this to answer questions about how login works in the project.
 	</div>
 	<button type="submit" class="btn btn-primary">Login</button>
 </form>
-<div *ngIf="error" class="alert alert-danger mt-3">{{ error }}</div>
+<div class="alert alert-danger mt-3" [hidden]="!error">{{ error }}</div>
 
 <div class="mt-3">
 	<span>Don't have an account?</span>

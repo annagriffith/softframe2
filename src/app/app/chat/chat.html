@@ -7,8 +7,15 @@ Use this to answer questions about how chat works in the project.
 <div *ngIf="channelId; else noChannel">
 	<div class="mb-3">
 		<h4>Channel: {{ channelId }}</h4>
+		<!-- Incoming call toast (auto-join is still enabled) -->
+		<div *ngIf="showCallToast" class="call-toast">
+			<span>Incoming call<span *ngIf="callFrom"> from {{ callFrom }}</span>…</span>
+			<button type="button" class="btn btn-sm" (click)="acceptCall()">Join</button>
+			<button type="button" class="btn btn-sm btn-outline" (click)="declineCall()">Dismiss</button>
+		</div>
+
 		<ul class="list-group mb-3">
-				<li *ngFor="let msg of messages" class="list-group-item d-flex align-items-start">
+			<li *ngFor="let msg of messages; trackBy: trackByIndex" class="list-group-item d-flex align-items-start">
 				<img *ngIf="msg.imagePath && msg.type==='image'" [src]="msg.imagePath" class="msg-image" alt="image message" />
 				<div>
 					<div class="d-flex align-items-center">
@@ -16,17 +23,18 @@ Use this to answer questions about how chat works in the project.
 						<strong>{{ msg.sender }}</strong>
 						<span class="text-muted chat-time">{{ msg.timestamp | date:'short' }}</span>
 					</div>
-					<div class="mt-1">{{ msg.text }}</div>
+					<div class="mt-1" *ngIf="msg.type !== 'callInvite'">{{ msg.text }}</div>
 				</div>
 			</li>
 		</ul>
-		<div class="input-group">
-			<input type="text" [(ngModel)]="newMessage" class="form-control" placeholder="Type a message...">
-			<button class="btn btn-primary" (click)="sendMessage()">Send</button>
+
+		<form (ngSubmit)="sendMessage(); $event.preventDefault()" class="input-group" autocomplete="off">
+			<input type="text" [(ngModel)]="newMessage" name="message" class="form-control" placeholder="Type a message..." (keydown.enter)="sendMessage(); $event.preventDefault()">
+			<button type="submit" class="btn btn-primary" [disabled]="!newMessage.trim()">Send</button>
+		</form>
+		<div class="mt-2">
+			<button *ngIf="channelId" (click)="startCall()" class="btn btn-outline-secondary btn-sm mt-2">Start/Join Call for this Channel</button>
 		</div>
-        <div class="mt-2">
-          <a *ngIf="channelId" [routerLink]="['/call']" [queryParams]="{ channel: channelId }" class="btn btn-outline-secondary btn-sm mt-2">Start/Join Call for this Channel</a>
-        </div>
 		<div class="mt-2">
 			<div *ngIf="imagePreviewUrl" class="mb-2">
 				<p class="mb-1">Preview:</p>

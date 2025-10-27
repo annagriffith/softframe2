@@ -93,7 +93,8 @@ Frontend (in repo root):
 
 ```powershell
 cd ..
-
+npm install
+npm run start
 # Serves at http://localhost:4200
 ```
 
@@ -105,6 +106,12 @@ Proxy & websockets:
 Health check:
 
 - <http://127.0.0.1:3001/api/health> → `{ "ok": true }`
+
+---
+
+## Feature checklist
+
+See `docs/FEATURE_CHECKLIST.md` for a detailed checklist you can use to verify all behaviors (roles, auth, chat, uploads, presence, calls, and tests).
 
 ---
 
@@ -163,6 +170,38 @@ Socket.IO
   - then `npm install --no-audit --no-fund`
 - Confirm Mongo is listening: `Test-NetConnection 127.0.0.1 -Port 27017`
 - Backend port check: `Test-NetConnection 127.0.0.1 -Port 3001`
+
+---
+
+## Calls: quick verify (Windows)
+
+Use these commands to quickly verify call invites via sockets and REST against a dedicated dev port:
+
+```powershell
+# Terminal 1 — start backend on 3005 with Tiny DB
+cd server
+npm run dev:3005
+
+# Terminal 2 — socket invite smoketest
+cd server
+cmd /c "set BASE=http://127.0.0.1:3005 && node smoketest.call.socket.js"
+
+# Terminal 2 — REST invite smoketest
+cd server
+cmd /c "set BASE=http://127.0.0.1:3005 && node smoketest.call.js"
+```
+
+Notes:
+- If port 3005 is in use, change `dev:3005` to a different port (e.g., `PORT=3002`) or stop the other process.
+- If you prefer Mongo instead of the Tiny DB, use `npm run dev:mongo` (port 3001 by default) and update `BASE` accordingly.
+
+---
+
+## Optional follow-ups
+
+- Add an in-app ringtone toggle and persist preference per user.
+- Improve end-call UX (confirm dialog, reason codes, and clearer banners for decline/cancel).
+- Show active call banner in channel list when a call is ongoing.
 
 ---
 

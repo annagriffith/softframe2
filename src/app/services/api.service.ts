@@ -50,6 +50,16 @@ export class ApiService {
     return this.http.post('/api/channels', payload);
   }
 
+  /** Add/remove group member. Body: { add?: username, remove?: username } */
+  updateGroupMembers(groupId: string, payload: any) {
+    return this.http.patch(`/api/groups/${groupId}/members`, payload);
+  }
+
+  /** Add/remove channel member. Body: { add?: username, remove?: username } */
+  updateChannelMembers(channelId: string, payload: any) {
+    return this.http.patch(`/api/channels/${channelId}/members`, payload);
+  }
+
   /** Send a text message to a channel. */
   sendMessage(payload: any) {
     return this.http.post('/api/messages', payload);
@@ -58,5 +68,10 @@ export class ApiService {
   /** Upload an image message to a channel. Multipart field 'image'. */
   uploadMessageImage(formData: FormData) {
     return this.http.post('/api/messages/image', formData);
+  }
+
+  /** Start a call in a channel; server will broadcast invite to the room. */
+  startCall(channelId: string) {
+    return this.http.post('/api/calls', { channelId });
   }
 }

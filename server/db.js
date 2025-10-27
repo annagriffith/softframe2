@@ -1,4 +1,5 @@
 const { MongoClient } = require('mongodb');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -12,6 +13,7 @@ try {
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'frametry';
+const USE_TINY_DB = (process.env.USE_TINY_DB || '').toLowerCase() === 'true';
 const ENABLE_INMEMORY_FLAG = (process.env.USE_INMEMORY_DB || '').toLowerCase() === 'true' || MONGO_URL === 'memory';
 const ALLOW_AUTO_FALLBACK = (process.env.ALLOW_INMEMORY_FALLBACK || 'true').toLowerCase() !== 'false';
 
@@ -91,6 +93,9 @@ function createTinyDb() {
         let result = store.filter(d => match(d, filter));
         if (options.projection) result = result.map(d => applyProjection(d, options.projection));
         return makeCursor(result);
+      },
+      async estimatedDocumentCount() {
+        return store.length;
       },
       async findOne(filter = {}, options = {}) {
         const doc = store.find(d => match(d, filter));
@@ -174,7 +179,10 @@ async function connect() {
   if (db) return db;
 
   try {
-    if (ENABLE_INMEMORY_FLAG) {
+    if (USE_TINY_DB) {
+      // Force tiny in-process DB (tests/dev only)
+      tinyDb = createTinyDb();
+    } else if (ENABLE_INMEMORY_FLAG) {
       client = await connectInMemory();
     } else {
       console.log('Connecting to MongoDB at', MONGO_URL, 'db:', DB_NAME);
@@ -209,10 +217,11 @@ async function connect() {
     // Only seed once
     const existing = await ucol.find().limit(1).toArray();
     if (existing.length === 0) {
+      const hash = await bcrypt.hash('123', 10);
       const users = [
-        { username: 'super', email: 'super@chat.com', role: 'superAdmin', password: '$2a$10$2jK1fFuJk6Yd7Y2WZqrQ9u3sQx3w2m1xU2pV8v1L0N1K2u3V4W5y6' /* dummy hash '123' */ , avatar: null },
-        { username: 'group', email: 'group@chat.com', role: 'groupAdmin', password: '$2a$10$2jK1fFuJk6Yd7Y2WZqrQ9u3sQx3w2m1xU2pV8v1L0N1K2u3V4W5y6', avatar: null },
-        { username: 'user',  email: 'user@chat.com',  role: 'user',       password: '$2a$10$2jK1fFuJk6Yd7Y2WZqrQ9u3sQx3w2m1xU2pV8v1L0N1K2u3V4W5y6', avatar: null },
+        { username: 'super', email: 'super@chat.com', role: 'superAdmin', password: hash, avatar: null },
+        { username: 'group', email: 'group@chat.com', role: 'groupAdmin', password: hash, avatar: null },
+        { username: 'user',  email: 'user@chat.com',  role: 'user',       password: hash, avatar: null },
       ];
       for (const u of users) await ucol.insertOne(u);
 

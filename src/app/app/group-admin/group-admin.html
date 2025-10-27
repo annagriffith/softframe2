@@ -39,8 +39,14 @@ Use this to answer questions about how group/channel management works in the pro
   </form>
   <ul>
     <li *ngFor="let channel of channels">
-      {{ channel.name }}
+  {{ channel.name }}
+  <a class="btn btn-sm btn-outline-primary ms-2" [routerLink]="['/chat', (channel.id || channel._id)]">Open</a>
       <button class="btn btn-danger btn-sm ms-2" (click)="deleteChannel(channel.id)">Delete Channel</button>
+      <div class="mt-1">
+        <label class="form-label me-2">Add member to channel</label>
+        <input class="form-control d-inline-block w-auto" [(ngModel)]="channelMemberToAdd[channel.id || channel._id]" placeholder="username">
+        <button class="btn btn-sm btn-success ms-2" (click)="addChannelMember(channel.id || channel._id)">Add</button>
+      </div>
     </li>
   </ul>
 

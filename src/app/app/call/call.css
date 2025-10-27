@@ -1,4 +1,22 @@
-.call-container { padding: 12px; }
-.videos { display:flex; gap:8px; }
-video { width: 320px; height: 240px; background: #000; }
-.controls { margin-top: 8px; }
+.call-container { 
+	padding: 16px; 
+	max-width: 1000px; 
+	margin: 0 auto; 
+	text-align: center;
+}
+.videos { 
+	display:flex; 
+	gap:12px; 
+	justify-content: center; 
+	align-items: center; 
+	flex-wrap: wrap;
+}
+video { 
+	width: min(640px, 46vw); 
+	aspect-ratio: 16 / 9; 
+	height: auto; 
+	background: #000; 
+	border-radius: 8px; 
+	box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.controls { margin-top: 12px; }
