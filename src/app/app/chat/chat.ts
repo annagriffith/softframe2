@@ -88,7 +88,8 @@ export class ChatComponent implements OnInit, OnDestroy {
         }
       });
       this.socket.on('history', (msgs: any[]) => {
-        if (msgs && msgs.length) this.messages = msgs;
+        // Always replace messages, even if empty, to avoid showing previous channel history
+        this.messages = Array.isArray(msgs) ? msgs : [];
       });
       // Call notifications coming from others in the same channel
       this.socket.on('call:notify', (p: any) => {
@@ -179,6 +180,8 @@ export class ChatComponent implements OnInit, OnDestroy {
       }
       this.channelId = nextChannel;
       this.currentRoom = this.channelId || null;
+      // Clear messages immediately so we don't show the old channel's conversation
+      this.messages = [];
       // join the room so socket.io emits reach us
       if (this.socket && this.channelId) {
         this.socket.emit('join', { channelId: this.channelId });
